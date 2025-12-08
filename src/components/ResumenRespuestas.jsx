@@ -13,15 +13,21 @@ const ResumenRespuestas = ({ answers, questions, results }) => {
         <div className="space-y-4">
           {answers.map((answer, index) => {
             const preguntaOriginal = questions && questions[index];
+            console.log("po", preguntaOriginal);
             const esCorrecta = answer.is_correct;
+            console.log("ec", esCorrecta);
             const opcionSeleccionada = answer.selected_option;
+            console.log("os", opcionSeleccionada);
             const textoSeleccionado =
               opcionSeleccionada !== null
                 ? preguntaOriginal[`option_${opcionSeleccionada}_text`]
                 : "";
+            console.log("ts", textoSeleccionado);
             const opcionCorrecta = preguntaOriginal.correct_option;
+            console.log("oc", opcionCorrecta);
             const textoCorrecto =
               preguntaOriginal[`option_${opcionCorrecta}_text`];
+            console.log("tc", textoCorrecto);
 
             return (
               <div

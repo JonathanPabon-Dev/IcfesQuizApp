@@ -1,76 +1,72 @@
-import { Bar } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
+import { Pie } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-);
+ChartJS.register(ArcElement, Tooltip, Legend);
 
-const EstadisticasQuiz = ({ questions, results, onVolverInicio }) => {
-  // Promedio general de puntaje (en %)
-  const averageScore = results.length
-    ? results.reduce((acc, curr) => acc + curr.score, 0) / results.length
+const EstadisticasQuiz = ({
+  questions,
+  answers,
+  results,
+  groupAnswers = [],
+  groupResults = [],
+  onVolverInicio,
+}) => {
+  // Puntuación del intento actual y del grupo
+  const averageScore = results?.score ?? 0;
+  const groupAverageScore = groupResults.length
+    ? groupResults.reduce((acc, curr) => acc + (curr.score ?? 0), 0) /
+      groupResults.length
     : 0;
 
-  // Estadísticas por pregunta: porcentaje de selección por opción
+  // Construir opciones y selección del usuario por pregunta
   const getOptionStats = (questionIndex) => {
-    const question = questions[questionIndex];
-    if (!question) return [];
-    return question.opciones.map((option) => {
-      const selectedCount = results.filter(
-        (r) => r.answers[questionIndex]?.selectedOptionId === option.id,
+    const q = questions[questionIndex];
+    if (!q) return [];
+    const selectedOptionId = answers?.[questionIndex]?.selected_option ?? null;
+    const options = [
+      { id: 1, text: q.option_1_text },
+      { id: 2, text: q.option_2_text },
+      { id: 3, text: q.option_3_text },
+      { id: 4, text: q.option_4_text },
+    ];
+    // Estadística individual (tu selección)
+    const userStats = options.map((opt) => ({
+      option: opt.text,
+      count: selectedOptionId === opt.id ? 1 : 0,
+      percentage: selectedOptionId === opt.id ? 100 : 0,
+    }));
+    const selectedText =
+      options.find((o) => o.id === selectedOptionId)?.text || "Sin respuesta";
+    // Estadística del grupo por opción
+    const groupByQuestion = groupAnswers.filter((a) => a.question_id === q.id);
+    const totalGroup = groupByQuestion.length || 1;
+    const groupStats = options.map((opt) => {
+      const count = groupByQuestion.filter(
+        (a) => a.selected_option === opt.id,
       ).length;
       return {
-        option: option.texto,
-        count: selectedCount,
-        percentage: results.length ? (selectedCount / results.length) * 100 : 0,
+        option: opt.text,
+        count,
+        percentage: (count / totalGroup) * 100,
       };
     });
-  };
-
-  // Estadísticas de tiempo por pregunta
-  const getTimeStats = (questionIndex) => {
-    const times = results
-      .map((r) => r.answers[questionIndex]?.timeSpent)
-      .filter((time) => typeof time === "number");
-    if (times.length === 0) {
-      return {
-        averageTime: 0,
-        fastestTime: 0,
-        slowestTime: 0,
-      };
-    }
-    return {
-      averageTime: times.reduce((acc, curr) => acc + curr, 0) / times.length,
-      fastestTime: Math.min(...times),
-      slowestTime: Math.max(...times),
-    };
+    return { userStats, groupStats, selectedText };
   };
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
+        display: true,
+        position: "right",
+        labels: {
+          color: "#ffffff",
+        },
       },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: (value) => `${value}%`,
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${ctx.parsed.toFixed(1)}%`,
         },
       },
     },
@@ -78,40 +74,41 @@ const EstadisticasQuiz = ({ questions, results, onVolverInicio }) => {
 
   return (
     <div className="w-full max-w-4xl">
-      <h2 className="mb-6 text-2xl font-bold text-gray-800">
+      <h2 className="mb-6 text-2xl font-bold text-indigo-100">
         Resumen Estadístico
       </h2>
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-lg bg-white p-4 shadow">
+        <div className="rounded-lg bg-indigo-950/50 p-4 shadow">
           <h3 className="mb-2 text-lg font-semibold">Datos Generales</h3>
-          <p className="text-gray-700">
-            Estudiantes evaluados: {results.length}
+          <p className="text-indigo-300">
+            Puntuación personal:{" "}
+            <span className="text-3xl font-bold">
+              {Number(averageScore).toFixed(1)}%
+            </span>
           </p>
-          <p className="text-gray-700">
-            Promedio general: {averageScore.toFixed(1)}%
+          <p className="text-indigo-300">
+            Promedio del grupo:{" "}
+            <span className="text-3xl font-bold">
+              {Number(groupAverageScore).toFixed(1)}%
+            </span>
           </p>
-        </div>
-        <div className="rounded-lg bg-white p-4 shadow">
-          <h3 className="mb-2 text-lg font-semibold">Mejores Puntuaciones</h3>
-          {[...results]
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 3)
-            .map((result, index) => (
-              <p key={index} className="text-gray-700">
-                {result.nombre}: {result.score.toFixed(1)}%
-              </p>
-            ))}
         </div>
       </div>
       <div className="space-y-8">
         {questions.map((question, qIndex) => {
-          const stats = getOptionStats(qIndex);
-          const timeStats = getTimeStats(qIndex);
+          const { groupStats, selectedText } = getOptionStats(qIndex);
+          const labels = [
+            question.option_1_text,
+            question.option_2_text,
+            question.option_3_text,
+            question.option_4_text,
+          ];
           const chartData = {
-            labels: question.opciones.map((o) => o.texto),
+            labels,
             datasets: [
               {
-                data: stats.map((s) => s.percentage),
+                label: "Grupo",
+                data: groupStats.map((s) => s.percentage),
                 backgroundColor: [
                   "rgba(54, 162, 235, 0.6)",
                   "rgba(75, 192, 192, 0.6)",
@@ -129,45 +126,37 @@ const EstadisticasQuiz = ({ questions, results, onVolverInicio }) => {
             ],
           };
           return (
-            <div key={question.id} className="rounded-lg bg-white p-6 shadow">
+            <div
+              key={question.id}
+              className="rounded-lg bg-indigo-950/50 p-6 shadow"
+            >
               <h3 className="mb-4 text-lg font-semibold">
-                Pregunta {qIndex + 1}: {question.pregunta}
+                Pregunta {qIndex + 1}: {question.question_text}
               </h3>
-              <div className="mb-4 grid grid-cols-1 gap-4 text-sm text-gray-600 md:grid-cols-3">
-                <div>
-                  <span className="font-medium">Tiempo promedio:</span>{" "}
-                  {timeStats.averageTime.toFixed(1)}s
-                </div>
-                <div>
-                  <span className="font-medium">Tiempo más rápido:</span>{" "}
-                  {timeStats.fastestTime.toFixed(1)}s
-                </div>
-                <div>
-                  <span className="font-medium">Tiempo más lento:</span>{" "}
-                  {timeStats.slowestTime.toFixed(1)}s
-                </div>
+              <div className="mb-3 text-sm text-indigo-300">
+                <span className="font-medium">Tu respuesta:</span>{" "}
+                {selectedText}
               </div>
-              <div className="h-64">
-                <Bar data={chartData} options={chartOptions} />
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                {stats.map((stat, index) => (
-                  <div key={index} className="text-sm text-gray-600">
-                    <span className="font-medium">{stat.option}:</span>{" "}
-                    {stat.count} estudiantes ({stat.percentage.toFixed(1)}%)
-                  </div>
-                ))}
+              <div className="flex h-64 w-full items-center justify-center">
+                <Pie
+                  data={chartData}
+                  options={chartOptions}
+                  aria-setsize={100}
+                />
               </div>
             </div>
           );
         })}
       </div>
-      <button
-        onClick={onVolverInicio}
-        className="mt-8 w-full rounded-lg bg-blue-500 px-6 py-3 text-white transition-colors hover:bg-blue-600"
-      >
-        Inicio
-      </button>
+      <div className="mt-4 flex items-center justify-center gap-2">
+        <button
+          onClick={onVolverInicio}
+          className="overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-8 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700"
+        >
+          <span className="relative z-10">Inicio</span>
+          <div className="absolute inset-0 -translate-x-full transform bg-gradient-to-r from-indigo-600 to-indigo-700 transition-transform duration-200 group-hover:translate-x-0"></div>
+        </button>
+      </div>
     </div>
   );
 };

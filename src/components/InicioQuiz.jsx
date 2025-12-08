@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getQuizzes, getResults, getStudentById } from "../client/api";
+import Swal from "sweetalert2";
 
 const InicioQuiz = ({ onStartQuiz }) => {
   const [quizId, setQuizId] = useState("");
@@ -70,7 +71,12 @@ const InicioQuiz = ({ onStartQuiz }) => {
     e.preventDefault();
     const disponible = await ValidaEstadoQuiz();
     if (!disponible) {
-      alert("El quiz ya ha sido realizado");
+      Swal.fire({
+        text: "El quiz ya ha sido realizado",
+        icon: "info",
+        confirmButtonColor: "#4547ce",
+        confirmButtonText: "Cerrar",
+      });
       setQuizId("");
       return;
     }

@@ -1,5 +1,5 @@
 import FormularioPreguntas from "../components/FormularioPreguntas";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getQuestions,
   getAnswers,
@@ -20,6 +20,23 @@ const Cuestionario = () => {
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
   const [results, setResults] = useState(null);
+  const [groupAnswers, setGroupAnswers] = useState([]);
+  const [groupResults, setGroupResults] = useState([]);
+  const finishingRef = useRef(false);
+
+  const establecerValoresInicio = () => {
+    setSeconds(0);
+    setName("");
+    setQuizId("");
+    setStudentId(null);
+    setView("start");
+    setQuestions([]);
+    setAnswers([]);
+    setResults(null);
+    setGroupAnswers([]);
+    setGroupResults([]);
+    finishingRef.current = false;
+  };
 
   const ObtenerTiempoQuiz = async () => {
     const quizTime = await getParameters("segundosIcfesQuiz");
@@ -65,15 +82,25 @@ const Cuestionario = () => {
   };
 
   const handleStartView = () => {
-    setView("start");
+    establecerValoresInicio();
+  };
+
+  const handleVolverInicio = () => {
+    establecerValoresInicio();
   };
 
   const handleFinishForm = async () => {
-    const answersData = await getAnswers(quizId, studentId);
-    setAnswers(answersData);
-    await InsertarResultados(answersData);
-    await ObtenerResultadosIndividual();
-    setView("summary");
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    try {
+      const answersData = await getAnswers(quizId, studentId);
+      setAnswers(answersData);
+      await InsertarResultados(answersData);
+      await ObtenerResultadosIndividual();
+      setView("summary");
+    } catch {
+      // opcional: manejo de error
+    }
   };
 
   const handleStatisticsView = () => {
@@ -86,6 +113,18 @@ const Cuestionario = () => {
       ObtenerPreguntas();
     }
   }, [view]);
+
+  // Cargar datos globales para comparativa al entrar a statistics
+  useEffect(() => {
+    const loadGroupData = async () => {
+      if (view !== "statistics" || !quizId) return;
+      const allAnswers = await getAnswers(quizId);
+      const allResults = await getResults(quizId);
+      setGroupAnswers(allAnswers || []);
+      setGroupResults(allResults || []);
+    };
+    loadGroupData();
+  }, [view, quizId]);
 
   if (view === "start") {
     return (
@@ -123,7 +162,6 @@ const Cuestionario = () => {
             <button
               onClick={handleStatisticsView}
               className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-8 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled
               title="Próximamente"
             >
               Estadísticas
@@ -137,11 +175,14 @@ const Cuestionario = () => {
   if (view === "statistics") {
     return (
       <div className="m-auto max-w-4xl min-w-3xl rounded-xl bg-indigo-900 p-10">
-        Estadísticas
-        {/* <EstadisticasQuiz
+        <EstadisticasQuiz
+          questions={questions}
+          results={results}
           answers={answers}
+          groupAnswers={groupAnswers}
+          groupResults={groupResults}
           onVolverInicio={handleVolverInicio}
-        /> */}
+        />
       </div>
     );
   }

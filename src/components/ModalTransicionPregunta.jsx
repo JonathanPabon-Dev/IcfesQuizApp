@@ -1,22 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const ModalTransicionPregunta = ({ onFinish, isLast }) => {
   const [contador, setContador] = useState(3);
+  const hasFinishedRef = useRef(false);
 
   useEffect(() => {
     setContador(3);
     const interval = setInterval(() => {
       setContador((prev) => {
-        if (prev <= 1) {
+        if (prev <= 0) {
           clearInterval(interval);
-          onFinish();
-          return 1;
+          return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (contador === 0 && !hasFinishedRef.current) {
+      hasFinishedRef.current = true;
+      onFinish();
+    }
+  }, [contador, onFinish]);
 
   return (
     <div className="bg-opacity-70 fixed inset-0 z-50 flex items-center justify-center bg-black">
@@ -49,7 +56,7 @@ const ModalTransicionPregunta = ({ onFinish, isLast }) => {
               />
             </svg>
             <span className="z-10 text-5xl font-bold text-indigo-200">
-              {contador}
+              {Math.max(contador, 1)}
             </span>
           </div>
         )}

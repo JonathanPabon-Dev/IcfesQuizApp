@@ -1,27 +1,22 @@
 import supabase from "../supabase/supabaseClient";
 
-export const getParameters = async (parameter) => {
+export const getQuestions = async (quizId, limit = null) => {
   const { data, error } = await supabase
-    .from("parameters")
-    .select()
-    .eq("name", parameter);
-  if (error) {
-    console.error("Error al obtener las preguntas.", error);
-    return null;
-  }
-  return data[0];
-};
-
-export const getQuestions = async (quizId) => {
-  const { data, error } = await supabase
-    .from("questions")
-    .select()
+    .from("quiz_questions")
+    .select("questions(*)")
     .eq("quiz_id", quizId);
   if (error) {
     console.error("Error al obtener las preguntas.", error);
-    return null;
+    return [];
   }
-  return data;
+  const questions = (data || []).map((row) => row.questions).filter(Boolean);
+  // Fisher-Yates shuffle: every quiz load picks a different random order.
+  for (let i = questions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [questions[i], questions[j]] = [questions[j], questions[i]];
+  }
+  // limit = configured question_count; null/0 = keep all (shuffled).
+  return limit ? questions.slice(0, limit) : questions;
 };
 
 export const getAnswers = async (quizId = "", studentId = null) => {
@@ -72,21 +67,16 @@ export const postResults = async (result) => {
   }
 };
 
-export const getQuizzes = async (grade_level) => {
-  const date = new Date().toISOString().split("T")[0];
-  let query = supabase
-    .from("quizzes")
-    .select()
-    .lte("available_since", date)
-    .eq("grade_level", grade_level);
-  query = query.or(`available_until.is.null,available_until.gte.${date}`);
-
-  const { data, error } = await query;
+export const getQuizzesByCourse = async (courseId) => {
+  const { data, error } = await supabase
+    .from("quiz_courses")
+    .select("quiz_id, quizzes(id, topic, duration_seconds, question_count)")
+    .eq("course_id", courseId);
   if (error) {
-    console.error("Error al obtener el listado de quices.", error);
-    return null;
+    console.error("Error al obtener los quizzes del curso.", error);
+    return [];
   }
-  return data;
+  return (data || []).map((row) => row.quizzes).filter(Boolean);
 };
 
 export const loginStudent = async (code, password) => {

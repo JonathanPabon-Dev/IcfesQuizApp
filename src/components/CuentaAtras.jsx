@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const CuentaAtras = ({ seconds = 0, onTimeFinish }) => {
+const CuentaAtras = ({ seconds = null, onTimeFinish }) => {
   const [timeLeft, setTimeLeft] = useState(seconds);
 
   useEffect(() => {
@@ -8,6 +8,10 @@ const CuentaAtras = ({ seconds = 0, onTimeFinish }) => {
   }, [seconds]);
 
   useEffect(() => {
+    if (!seconds) {
+      return;
+    }
+
     if (timeLeft === 0) {
       const timerId = setTimeout(() => {
         onTimeFinish();
@@ -26,13 +30,17 @@ const CuentaAtras = ({ seconds = 0, onTimeFinish }) => {
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [timeLeft, onTimeFinish]);
+  }, [timeLeft, onTimeFinish, seconds]);
 
   const formatTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
   };
+
+  if (!seconds) {
+    return null;
+  }
 
   return (
     <div

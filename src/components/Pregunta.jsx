@@ -1,4 +1,10 @@
-const Pregunta = ({ question, options, onSelect, selectedOptionId }) => {
+const Pregunta = ({
+  question,
+  questionImage = "",
+  options,
+  onSelect,
+  selectedOptionId,
+}) => {
   const handleSelectOption = (id) => {
     onSelect(id);
   };
@@ -7,6 +13,13 @@ const Pregunta = ({ question, options, onSelect, selectedOptionId }) => {
     <div className="flex w-full flex-col items-center gap-6">
       <div className="w-full rounded-xl bg-indigo-900/30 p-6 shadow-lg backdrop-blur-sm">
         <p className="text-center text-lg text-indigo-100">{question}</p>
+        {questionImage && (
+          <img
+            src={questionImage}
+            alt="Imagen de la pregunta"
+            className="mx-auto mt-4 max-h-56 rounded-lg object-contain"
+          />
+        )}
       </div>
       <div className="grid w-full grid-cols-2 gap-4">
         {options.map((opc, idx) => (
@@ -21,6 +34,13 @@ const Pregunta = ({ question, options, onSelect, selectedOptionId }) => {
             onClick={() => handleSelectOption(opc.id)}
           >
             <span className="relative z-10">{opc.text || opc}</span>
+            {opc.imageUrl && (
+              <img
+                src={opc.imageUrl}
+                alt={`Opción ${opc.id}`}
+                className="mx-auto mt-2 max-h-40 rounded-lg object-contain"
+              />
+            )}
             {selectedOptionId === opc.id && (
               <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10" />
             )}

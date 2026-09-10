@@ -15,6 +15,7 @@ const FormularioPreguntas = ({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [question, setQuestion] = useState("");
+  const [questionImage, setQuestionImage] = useState("");
   const [options, setOptions] = useState([]);
   const [selectedOptionId, setSelectedOptionId] = useState(null);
   const [key, setKey] = useState(0);
@@ -70,14 +71,34 @@ const FormularioPreguntas = ({
   useEffect(() => {
     if (currentQuestion) {
       setQuestion(currentQuestion.question_text);
-      setOptions([
-        { id: 1, text: currentQuestion.option_1_text },
-        { id: 2, text: currentQuestion.option_2_text },
-        { id: 3, text: currentQuestion.option_3_text },
-        { id: 4, text: currentQuestion.option_4_text },
-      ]);
+      setQuestionImage(currentQuestion.question_image_url || "");
+      setOptions(
+        [
+          {
+            id: 1,
+            text: currentQuestion.option_1_text,
+            imageUrl: currentQuestion.option_1_image_url,
+          },
+          {
+            id: 2,
+            text: currentQuestion.option_2_text,
+            imageUrl: currentQuestion.option_2_image_url,
+          },
+          {
+            id: 3,
+            text: currentQuestion.option_3_text,
+            imageUrl: currentQuestion.option_3_image_url,
+          },
+          {
+            id: 4,
+            text: currentQuestion.option_4_text,
+            imageUrl: currentQuestion.option_4_image_url,
+          },
+        ].filter((opc) => opc.text || opc.imageUrl),
+      );
     } else {
       setQuestion("");
+      setQuestionImage("");
       setOptions([]);
     }
   }, [currentQuestion]);
@@ -113,6 +134,7 @@ const FormularioPreguntas = ({
           <div className="flex w-full flex-col items-center gap-6">
             <Pregunta
               question={question}
+              questionImage={questionImage}
               options={options}
               onSelect={handleSelectedOption}
               selectedOptionId={selectedOptionId}

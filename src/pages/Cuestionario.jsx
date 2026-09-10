@@ -133,6 +133,7 @@ const Cuestionario = () => {
     return (
       <div className="m-auto max-w-4xl min-w-3xl rounded-xl bg-indigo-900 p-10">
         <InicioQuiz
+          key={session ? session.studentId : "anon"}
           session={session}
           onLogin={handleLogin}
           onLogout={handleLogout}

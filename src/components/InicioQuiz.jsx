@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { getQuizzesByCourse, getResults, loginStudent } from "../client/api";
 
+// Portal de cambio de contraseña de estudiantes (panel de administración).
+// La contraseña inicial de cada estudiante es su código; cuando el login
+// entra con esa contraseña, el cambio es obligatorio y se redirige aquí.
+const QMK_ADMIN_PANEL_URL =
+  import.meta.env.VITE_QMK_ADMIN_PANEL_URL ??
+  "https://jonathanpabon-dev.github.io/QmkAdminPanel/";
+
 const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) => {
   const [studentId, setStudentId] = useState(session?.studentId ?? null);
   const [password, setPassword] = useState("");
@@ -10,6 +17,7 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
   const [pendientes, setPendientes] = useState([]);
   const [presentados, setPresentados] = useState([]);
   const [showStudentMsg, setShowStudentMsg] = useState(false);
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
   const studentIdRef = useRef(null);
 
   const handleInputStudentId = (e) => {
@@ -32,6 +40,16 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
     const response = await loginStudent(studentId, password);
     if (!response || Object.keys(response).length === 0) {
       setShowStudentMsg("Código o contraseña incorrectos");
+      setPassword("");
+      return;
+    }
+    // Contraseña inicial = código del estudiante. Si entró con esa
+    // contraseña, el cambio es obligatorio: se muestra el mensaje y se
+    // redirige al portal de cambio de contraseña (QmkAdminPanel).
+    // El backend también puede reportar must_change_password (migración
+    // 20260914) cuando la contraseña sigue siendo igual al código.
+    if (response.must_change_password === true || password === studentId) {
+      setForcePasswordChange(true);
       setPassword("");
       return;
     }
@@ -105,6 +123,31 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
       </div>
 
       {!authenticated ? (
+        forcePasswordChange ? (
+          <div className="flex w-full max-w-md flex-col items-center gap-6">
+            <div className="w-full rounded-lg border-2 border-amber-500/40 bg-amber-500/10 px-5 py-4 text-center shadow-inner">
+              <p className="text-lg font-semibold text-amber-300">
+                Cambio de contraseña obligatorio
+              </p>
+              <p className="mt-2 text-sm text-indigo-100">
+                Usaste la contraseña inicial (igual a tu código). Por
+                seguridad debes definir una contraseña personal antes de
+                continuar.
+              </p>
+              <p className="mt-2 text-sm text-indigo-300">
+                Haz clic en el botón para ir al portal de cambio de
+                contraseña.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => (window.location.href = QMK_ADMIN_PANEL_URL)}
+              className="group relative w-full overflow-hidden rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-amber-600 hover:to-orange-600"
+            >
+              <span className="relative z-10">Cambiar contraseña ahora</span>
+            </button>
+          </div>
+        ) : (
         <div className="flex w-full max-w-md flex-col items-center gap-6">
           <div className="w-full">
             <label
@@ -153,7 +196,8 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
           {showStudentMsg && (
             <p className="mt-2 w-full text-red-500">{showStudentMsg}</p>
           )}
-        </div>
+          </div>
+        )
       ) : (
         <div className="flex w-full max-w-md flex-col items-center gap-6">
           <div className="flex w-full items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-500/30 px-4 py-3 shadow-inner">

@@ -89,14 +89,19 @@ export const getQuizzes = async (grade_level) => {
   return data;
 };
 
-export const getStudentById = async (studentId) => {
-  const { data, error } = await supabase
-    .from("students")
-    .select()
-    .eq("id", studentId);
-  if (error) {
-    console.error("Error al obtener el estudiante.", error);
+export const loginStudent = async (code, password) => {
+  try {
+    const { data, error } = await supabase.rpc("login_student", {
+      p_code: Number(code),
+      p_password: password,
+    });
+    if (error) {
+      console.error("Error al validar las credenciales.", error);
+      return null;
+    }
+    return data;
+  } catch (error) {
+    console.error("Error al validar las credenciales.", error);
     return null;
   }
-  return data;
 };

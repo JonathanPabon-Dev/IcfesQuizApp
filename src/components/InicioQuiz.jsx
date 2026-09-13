@@ -160,6 +160,7 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
               id="studentId"
               ref={studentIdRef}
               type="search"
+              autoComplete="off"
               inputMode="numeric"
               pattern="\d*"
               className="w-full rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 text-indigo-100 placeholder-indigo-400 shadow-inner transition-colors duration-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 focus:outline-none"
@@ -178,6 +179,7 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
             <input
               id="password"
               type="password"
+              autoComplete="off"
               className="w-full rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 text-indigo-100 placeholder-indigo-400 shadow-inner transition-colors duration-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 focus:outline-none"
               value={password}
               onChange={handleInputPassword}

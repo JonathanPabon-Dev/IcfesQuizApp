@@ -11,11 +11,6 @@ import ResumenRespuestas from "../components/ResumenRespuestas";
 import InicioQuiz from "../components/InicioQuiz";
 import supabase from "../supabase/supabaseClient";
 
-// Tab-scoped opt-out for session hydration. Set when the student logs out of
-// this app so a page refresh does not restore the panel session; opening the
-// app in a new tab keeps hydration enabled (fresh sessionStorage).
-const SKIP_HYDRATION_KEY = "icfes-skip-hydration";
-
 // Panel de administración (QmkAdminPanel). La app solo es accesible con una
 // sesión válida del panel: sin ella se redirige aquí automáticamente.
 const QMK_ADMIN_PANEL_URL =
@@ -37,7 +32,6 @@ const Cuestionario = () => {
   const finishingRef = useRef(false);
 
   const handleLogout = () => {
-    sessionStorage.setItem(SKIP_HYDRATION_KEY, "1");
     setSession(null);
     setName("");
     setQuizId("");
@@ -144,10 +138,10 @@ const Cuestionario = () => {
   }, [view]);
 
   // Hidratación al arranque: el único acceso a la app es la sesión del
-  // QmkAdminPanel (mismo origen github.io y misma BD). Si el estudiante
-  // cerró sesión en esta pestaña (SKIP_HYDRATION_KEY), si no hay sesión de
+  // QmkAdminPanel (mismo origen github.io y misma BD). Si no hay sesión de
   // Supabase Auth, si la cuenta no tiene estudiante vinculado o si ocurre un
-  // error, se redirige automáticamente al panel.
+  // error, se redirige automáticamente al panel. No hay opt-out por pestaña:
+  // "Cerrar sesión" solo vuelve al panel y el reingreso depende de la sesión.
   useEffect(() => {
     let active = true;
 
@@ -159,10 +153,6 @@ const Cuestionario = () => {
     };
 
     const hydrateSession = async () => {
-      if (sessionStorage.getItem(SKIP_HYDRATION_KEY)) {
-        redirectToPanel();
-        return;
-      }
       try {
         const { data: authData, error: authError } =
           await supabase.auth.getSession();

@@ -5,12 +5,20 @@ import {
   getAnswers,
   getResults,
   postResults,
+  getStudentByAuthUid,
 } from "../client/api";
 import ResumenRespuestas from "../components/ResumenRespuestas";
 import InicioQuiz from "../components/InicioQuiz";
+import supabase from "../supabase/supabaseClient";
+
+// Tab-scoped opt-out for session hydration. Set when the student logs out of
+// this app so a page refresh does not restore the panel session; opening the
+// app in a new tab keeps hydration enabled (fresh sessionStorage).
+const SKIP_HYDRATION_KEY = "icfes-skip-hydration";
 
 const Cuestionario = () => {
   const [session, setSession] = useState(null);
+  const [hydrating, setHydrating] = useState(true);
   const [seconds, setSeconds] = useState(null);
   const [questionCount, setQuestionCount] = useState(null);
   const [name, setName] = useState("");
@@ -23,10 +31,12 @@ const Cuestionario = () => {
   const finishingRef = useRef(false);
 
   const handleLogin = (sessionData) => {
+    sessionStorage.removeItem(SKIP_HYDRATION_KEY);
     setSession(sessionData);
   };
 
   const handleLogout = () => {
+    sessionStorage.setItem(SKIP_HYDRATION_KEY, "1");
     setSession(null);
     setName("");
     setQuizId("");
@@ -129,17 +139,66 @@ const Cuestionario = () => {
     }
   }, [view]);
 
+  // Hidratación al arranque: si ya hay una sesión de Supabase Auth (mismo
+  // origen github.io y misma BD que el QmkAdminPanel), se resuelve el
+  // estudiante vinculado y se restaura la sesión sin pasar por el login.
+  // Sin sesión, estudiante nulo o error -> flujo normal (login por código).
+  useEffect(() => {
+    let active = true;
+    if (sessionStorage.getItem(SKIP_HYDRATION_KEY)) {
+      setHydrating(false);
+      return;
+    }
+    const hydrateSession = async () => {
+      try {
+        const { data: authData, error: authError } =
+          await supabase.auth.getSession();
+        if (authError || !authData?.session || !active) return;
+        const { data: student, error: studentError } =
+          await getStudentByAuthUid();
+        if (studentError || !student || !active) return;
+        if (active) {
+          const name = `${student.first_name}${student.second_name ? " " + student.second_name : ""} ${student.first_lastname}${student.second_lastname ? " " + student.second_lastname : ""}`;
+          setSession({
+            studentId: student.id,
+            studentName: name,
+            courseId: student.course_id,
+            mustChangePassword: student.must_change_password === true,
+          });
+        }
+      } catch (error) {
+        console.error("Error al restaurar la sesión.", error);
+      } finally {
+        if (active) {
+          setHydrating(false);
+        }
+      }
+    };
+    hydrateSession();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   if (view === "start") {
     return (
       <div className="m-auto max-w-4xl min-w-3xl rounded-xl bg-indigo-900 p-10">
-        <InicioQuiz
-          key={session ? session.studentId : "anon"}
-          session={session}
-          onLogin={handleLogin}
-          onLogout={handleLogout}
-          onStartQuiz={handleStartQuiz}
-          onViewResult={handleViewResult}
-        />
+        {hydrating ? (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 rounded-xl bg-indigo-950/50 p-8 shadow-xl backdrop-blur-sm">
+            <p className="text-lg font-semibold text-indigo-200">
+              Cargando…
+            </p>
+          </div>
+        ) : (
+          <InicioQuiz
+            key={session ? session.studentId : "anon"}
+            session={session}
+            onLogin={handleLogin}
+            onLogout={handleLogout}
+            onStartQuiz={handleStartQuiz}
+            onViewResult={handleViewResult}
+          />
+        )}
       </div>
     );
   }

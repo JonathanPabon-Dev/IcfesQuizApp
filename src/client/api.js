@@ -95,3 +95,20 @@ export const loginStudent = async (code, password) => {
     return null;
   }
 };
+
+// Resuelve el estudiante vinculado a la sesión de Supabase Auth
+// (auth.uid() -> fila en students, security definer en el panel).
+// Devuelve { data, error } para que el llamador distinga entre
+// "sin fila de estudiante" (data null) y error real.
+export const getStudentByAuthUid = async () => {
+  try {
+    const { data, error } = await supabase.rpc("get_student_by_auth_uid");
+    if (error) {
+      console.error("Error al obtener el estudiante por sesión.", error);
+    }
+    return { data, error };
+  } catch (error) {
+    console.error("Error al obtener el estudiante por sesión.", error);
+    return { data: null, error };
+  }
+};

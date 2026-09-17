@@ -1,119 +1,63 @@
-import { useState, useEffect, useRef } from "react";
-import { getQuizzesByCourse, getResults, loginStudent } from "../client/api";
+import { useState, useEffect } from "react";
+import { getQuizzesByCourse, getResults } from "../client/api";
 
-// Portal de cambio de contraseña de estudiantes (panel de administración).
-// La contraseña inicial de cada estudiante es su código; cuando el login
-// entra con esa contraseña, el cambio es obligatorio y se redirige aquí.
-const QMK_ADMIN_PANEL_URL =
-  import.meta.env.VITE_QMK_ADMIN_PANEL_URL ??
-  "https://jonathanpabon-dev.github.io/QmkAdminPanel/";
+// Authenticated phase of the quiz home. The app no longer has a login
+// screen: the parent (Cuestionario) only renders this component when a
+// valid QmkAdminPanel session was hydrated. Without a session it renders
+// null and the parent redirects to the panel.
+const InicioQuiz = ({ session, onLogout, onStartQuiz, onViewResult }) => {
+  const studentId = session?.studentId ?? null;
+  const studentName = session?.studentName ?? "";
+  const courseId = session?.courseId ?? null;
 
-const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) => {
-  const [studentId, setStudentId] = useState(session?.studentId ?? null);
-  const [password, setPassword] = useState("");
-  const [authenticated, setAuthenticated] = useState(!!session);
-  const [studentName, setStudentName] = useState(session?.studentName ?? "");
-  const [courseId, setCourseId] = useState(session?.courseId ?? null);
   const [pendientes, setPendientes] = useState([]);
   const [presentados, setPresentados] = useState([]);
-  const [showStudentMsg, setShowStudentMsg] = useState(false);
-  // Se activa por handleLogin (contraseña inicial = código) o cuando la
-  // sesión hidratada del panel llega con mustChangePassword: true.
-  const [forcePasswordChange, setForcePasswordChange] = useState(
-    session?.mustChangePassword === true,
-  );
-  const studentIdRef = useRef(null);
-
-  const handleInputStudentId = (e) => {
-    const newValue = e.target.value;
-    if (/^\d*$/.test(newValue) && newValue.length <= 6) {
-      setStudentId(e.target.value);
-    }
-  };
-
-  const handleInputPassword = (e) => {
-    setPassword(e.target.value);
-  };
-
-  const handleLogin = async () => {
-    setShowStudentMsg(false);
-    if (!studentId || !password) {
-      setShowStudentMsg("Ingrese el código y la contraseña");
-      return;
-    }
-    const response = await loginStudent(studentId, password);
-    if (!response || Object.keys(response).length === 0) {
-      setShowStudentMsg("Código o contraseña incorrectos");
-      setPassword("");
-      return;
-    }
-    // Contraseña inicial = código del estudiante. Si entró con esa
-    // contraseña, el cambio es obligatorio: se muestra el mensaje y se
-    // redirige al portal de cambio de contraseña (QmkAdminPanel).
-    // El backend también puede reportar must_change_password (migración
-    // 20260914) cuando la contraseña sigue siendo igual al código.
-    if (response.must_change_password === true || password === studentId) {
-      setForcePasswordChange(true);
-      setPassword("");
-      return;
-    }
-    const name = `${response.first_name}${response.second_name ? " " + response.second_name : ""} ${response.first_lastname}${response.second_lastname ? " " + response.second_lastname : ""}`;
-    setStudentName(name);
-    setCourseId(response.course_id);
-    setAuthenticated(true);
-    onLogin({
-      studentId: response.id,
-      studentName: name,
-      courseId: response.course_id,
-    });
-  };
 
   useEffect(() => {
-    if (authenticated && courseId !== null) {
-      const loadQuizzes = async () => {
-        const [quizzes, results] = await Promise.all([
-          getQuizzesByCourse(courseId),
-          getResults("", studentId),
-        ]);
+    if (courseId === null || studentId === null) {
+      return;
+    }
+    const loadQuizzes = async () => {
+      const [quizzes, results] = await Promise.all([
+        getQuizzesByCourse(courseId),
+        getResults("", studentId),
+      ]);
 
-        const resultByQuiz = {};
-        if (results) {
-          results.forEach((r) => {
-            const existing = resultByQuiz[r.quiz_id];
-            if (
-              !existing ||
-              new Date(r.date_taken) > new Date(existing.date_taken)
-            ) {
-              resultByQuiz[r.quiz_id] = {
-                score: r.score,
-                date_taken: r.date_taken,
-              };
-            }
-          });
-        }
-
-        const pend = [];
-        const pres = [];
-        quizzes.forEach((quiz) => {
-          if (resultByQuiz[quiz.id]) {
-            pres.push({ ...quiz, result: resultByQuiz[quiz.id] });
-          } else {
-            pend.push(quiz);
+      const resultByQuiz = {};
+      if (results) {
+        results.forEach((r) => {
+          const existing = resultByQuiz[r.quiz_id];
+          if (
+            !existing ||
+            new Date(r.date_taken) > new Date(existing.date_taken)
+          ) {
+            resultByQuiz[r.quiz_id] = {
+              score: r.score,
+              date_taken: r.date_taken,
+            };
           }
         });
+      }
 
-        setPendientes(pend);
-        setPresentados(pres);
-      };
-      loadQuizzes();
-    }
-  }, [authenticated, courseId, studentId]);
+      const pend = [];
+      const pres = [];
+      quizzes.forEach((quiz) => {
+        if (resultByQuiz[quiz.id]) {
+          pres.push({ ...quiz, result: resultByQuiz[quiz.id] });
+        } else {
+          pend.push(quiz);
+        }
+      });
 
-  useEffect(() => {
-    if (!authenticated && studentIdRef.current) {
-      studentIdRef.current.focus();
-    }
-  }, [authenticated]);
+      setPendientes(pend);
+      setPresentados(pres);
+    };
+    loadQuizzes();
+  }, [courseId, studentId]);
+
+  if (!session) {
+    return null;
+  }
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 rounded-xl bg-indigo-950/50 p-8 shadow-xl backdrop-blur-sm">
@@ -126,176 +70,96 @@ const InicioQuiz = ({ session, onLogin, onLogout, onStartQuiz, onViewResult }) =
         </p>
       </div>
 
-      {forcePasswordChange ? (
-        <div className="flex w-full max-w-md flex-col items-center gap-6">
-          <div className="w-full rounded-lg border-2 border-amber-500/40 bg-amber-500/10 px-5 py-4 text-center shadow-inner">
-            <p className="text-lg font-semibold text-amber-300">
-              Cambio de contraseña obligatorio
-            </p>
-            <p className="mt-2 text-sm text-indigo-100">
-              Usaste la contraseña inicial (igual a tu código). Por
-              seguridad debes definir una contraseña personal antes de
-              continuar.
-            </p>
-            <p className="mt-2 text-sm text-indigo-300">
-              Haz clic en el botón para ir al portal de cambio de
-              contraseña.
-            </p>
-          </div>
+      <div className="flex w-full max-w-md flex-col items-center gap-6">
+        <div className="flex w-full items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-500/30 px-4 py-3 shadow-inner">
+          {studentName && <p className="text-indigo-100">{studentName}</p>}
           <button
             type="button"
-            onClick={() => (window.location.href = QMK_ADMIN_PANEL_URL)}
-            className="group relative w-full overflow-hidden rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 px-8 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-amber-600 hover:to-orange-600"
+            onClick={onLogout}
+            className="ml-4 shrink-0 rounded-lg border border-indigo-400/40 px-3 py-1 text-sm font-medium text-indigo-200 transition-colors duration-200 hover:border-indigo-400 hover:bg-indigo-400/20 hover:text-white"
           >
-            <span className="relative z-10">Cambiar contraseña ahora</span>
+            Cerrar sesión
           </button>
         </div>
-      ) : !authenticated ? (
-        <div className="flex w-full max-w-md flex-col items-center gap-6">
-          <div className="w-full">
-            <label
-              htmlFor="studentId"
-              className="mb-2 block text-lg font-medium text-indigo-300"
-            >
-              Código estudiante
-            </label>
-            <input
-              id="studentId"
-              ref={studentIdRef}
-              type="search"
-              autoComplete="off"
-              inputMode="numeric"
-              pattern="\d*"
-              className="w-full rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 text-indigo-100 placeholder-indigo-400 shadow-inner transition-colors duration-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 focus:outline-none"
-              value={studentId || ""}
-              onChange={handleInputStudentId}
-              required
-            />
-          </div>
-          <div className="w-full">
-            <label
-              htmlFor="password"
-              className="mb-2 block text-lg font-medium text-indigo-300"
-            >
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="off"
-              className="w-full rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 text-indigo-100 placeholder-indigo-400 shadow-inner transition-colors duration-200 focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 focus:outline-none"
-              value={password}
-              onChange={handleInputPassword}
-              placeholder="Ingrese la contraseña"
-              required
-            />
-          </div>
-          <button
-            type="button"
-            onClick={handleLogin}
-            className="group relative w-full overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-8 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700"
-          >
-            <span className="relative z-10">Ingresar</span>
-            <div className="absolute inset-0 -translate-x-full transform bg-gradient-to-r from-indigo-600 to-indigo-700 transition-transform duration-200 group-hover:translate-x-0"></div>
-          </button>
-          {showStudentMsg && (
-            <p className="mt-2 w-full text-red-500">{showStudentMsg}</p>
+
+        <div className="w-full">
+          <h2 className="mb-3 text-lg font-medium text-indigo-300">
+            Pendientes
+          </h2>
+          {pendientes.length === 0 ? (
+            <p className="text-sm text-indigo-400">
+              No tienes quizzes pendientes
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {pendientes.map((quiz) => (
+                <li
+                  key={quiz.id}
+                  className="flex items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 shadow-inner"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-indigo-100">{quiz.topic}</span>
+                    <span className="text-xs text-indigo-400">
+                      {quiz.duration_seconds != null
+                        ? `${quiz.duration_seconds} s`
+                        : "Sin límite"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onStartQuiz(
+                        quiz.id,
+                        studentId,
+                        studentName,
+                        quiz.duration_seconds,
+                        quiz.question_count,
+                      )
+                    }
+                    className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-2 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700"
+                  >
+                    <span className="relative z-10">Iniciar quiz</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      ) : (
-        <div className="flex w-full max-w-md flex-col items-center gap-6">
-          <div className="flex w-full items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-500/30 px-4 py-3 shadow-inner">
-            {studentName && (
-              <p className="text-indigo-100">{studentName}</p>
-            )}
-            <button
-              type="button"
-              onClick={onLogout}
-              className="ml-4 shrink-0 rounded-lg border border-indigo-400/40 px-3 py-1 text-sm font-medium text-indigo-200 transition-colors duration-200 hover:border-indigo-400 hover:bg-indigo-400/20 hover:text-white"
-            >
-              Cerrar sesión
-            </button>
-          </div>
 
-          <div className="w-full">
-            <h2 className="mb-3 text-lg font-medium text-indigo-300">
-              Pendientes
-            </h2>
-            {pendientes.length === 0 ? (
-              <p className="text-sm text-indigo-400">
-                No tienes quizzes pendientes
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {pendientes.map((quiz) => (
-                  <li
-                    key={quiz.id}
-                    className="flex items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 shadow-inner"
+        <div className="w-full">
+          <h2 className="mb-3 text-lg font-medium text-indigo-300">
+            Presentados
+          </h2>
+          {presentados.length === 0 ? (
+            <p className="text-sm text-indigo-400">
+              Aún no has presentado quizzes
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {presentados.map((quiz) => (
+                <li
+                  key={quiz.id}
+                  className="flex items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 shadow-inner"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-indigo-100">{quiz.topic}</span>
+                    <span className="text-sm text-indigo-400">
+                      Resultado: {Math.round(quiz.result.score)}%
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onViewResult(quiz.id)}
+                    className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-2 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700"
                   >
-                    <div className="flex flex-col">
-                      <span className="text-indigo-100">{quiz.topic}</span>
-                      <span className="text-xs text-indigo-400">
-                        {quiz.duration_seconds != null
-                          ? `${quiz.duration_seconds} s`
-                          : "Sin límite"}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onStartQuiz(
-                          quiz.id,
-                          studentId,
-                          studentName,
-                          quiz.duration_seconds,
-                          quiz.question_count,
-                        )
-                      }
-                      className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-2 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700"
-                    >
-                      <span className="relative z-10">Iniciar quiz</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="w-full">
-            <h2 className="mb-3 text-lg font-medium text-indigo-300">
-              Presentados
-            </h2>
-            {presentados.length === 0 ? (
-              <p className="text-sm text-indigo-400">
-                Aún no has presentado quizzes
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {presentados.map((quiz) => (
-                  <li
-                    key={quiz.id}
-                    className="flex items-center justify-between rounded-lg border-2 border-indigo-500/30 bg-indigo-950/50 px-4 py-3 shadow-inner"
-                  >
-                    <div className="flex flex-col">
-                      <span className="text-indigo-100">{quiz.topic}</span>
-                      <span className="text-sm text-indigo-400">
-                        Resultado: {Math.round(quiz.result.score)}%
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onViewResult(quiz.id)}
-                      className="group relative overflow-hidden rounded-lg bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-2 font-semibold text-white shadow-lg transition-all duration-200 hover:cursor-pointer hover:from-indigo-600 hover:to-indigo-700"
-                    >
-                      <span className="relative z-10">Ver resultado</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+                    <span className="relative z-10">Ver resultado</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

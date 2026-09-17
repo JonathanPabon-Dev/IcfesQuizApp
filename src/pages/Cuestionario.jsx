@@ -16,6 +16,12 @@ import supabase from "../supabase/supabaseClient";
 // app in a new tab keeps hydration enabled (fresh sessionStorage).
 const SKIP_HYDRATION_KEY = "icfes-skip-hydration";
 
+// Panel de administración (QmkAdminPanel). La app solo es accesible con una
+// sesión válida del panel: sin ella se redirige aquí automáticamente.
+const QMK_ADMIN_PANEL_URL =
+  import.meta.env.VITE_QMK_ADMIN_PANEL_URL ??
+  "https://jonathanpabon-dev.github.io/QmkAdminPanel/";
+
 const Cuestionario = () => {
   const [session, setSession] = useState(null);
   const [hydrating, setHydrating] = useState(true);
@@ -30,11 +36,6 @@ const Cuestionario = () => {
   const [results, setResults] = useState(null);
   const finishingRef = useRef(false);
 
-  const handleLogin = (sessionData) => {
-    sessionStorage.removeItem(SKIP_HYDRATION_KEY);
-    setSession(sessionData);
-  };
-
   const handleLogout = () => {
     sessionStorage.setItem(SKIP_HYDRATION_KEY, "1");
     setSession(null);
@@ -48,6 +49,9 @@ const Cuestionario = () => {
     setResults(null);
     setView("start");
     finishingRef.current = false;
+    // El logout es solo de la app de quizzes: la sesión de Supabase Auth se
+    // conserva (es del panel) y la navegación vuelve al QmkAdminPanel.
+    window.location.replace(QMK_ADMIN_PANEL_URL);
   };
 
   const goToStart = () => {
@@ -139,35 +143,50 @@ const Cuestionario = () => {
     }
   }, [view]);
 
-  // Hidratación al arranque: si ya hay una sesión de Supabase Auth (mismo
-  // origen github.io y misma BD que el QmkAdminPanel), se resuelve el
-  // estudiante vinculado y se restaura la sesión sin pasar por el login.
-  // Sin sesión, estudiante nulo o error -> flujo normal (login por código).
+  // Hidratación al arranque: el único acceso a la app es la sesión del
+  // QmkAdminPanel (mismo origen github.io y misma BD). Si el estudiante
+  // cerró sesión en esta pestaña (SKIP_HYDRATION_KEY), si no hay sesión de
+  // Supabase Auth, si la cuenta no tiene estudiante vinculado o si ocurre un
+  // error, se redirige automáticamente al panel.
   useEffect(() => {
     let active = true;
-    if (sessionStorage.getItem(SKIP_HYDRATION_KEY)) {
-      setHydrating(false);
-      return;
-    }
+
+    const redirectToPanel = () => {
+      if (active) {
+        setHydrating(false);
+      }
+      window.location.replace(QMK_ADMIN_PANEL_URL);
+    };
+
     const hydrateSession = async () => {
+      if (sessionStorage.getItem(SKIP_HYDRATION_KEY)) {
+        redirectToPanel();
+        return;
+      }
       try {
         const { data: authData, error: authError } =
           await supabase.auth.getSession();
-        if (authError || !authData?.session || !active) return;
+        if (authError || !authData?.session) {
+          redirectToPanel();
+          return;
+        }
         const { data: student, error: studentError } =
           await getStudentByAuthUid();
-        if (studentError || !student || !active) return;
+        if (studentError || !student) {
+          redirectToPanel();
+          return;
+        }
         if (active) {
           const name = `${student.first_name}${student.second_name ? " " + student.second_name : ""} ${student.first_lastname}${student.second_lastname ? " " + student.second_lastname : ""}`;
           setSession({
             studentId: student.id,
             studentName: name,
             courseId: student.course_id,
-            mustChangePassword: student.must_change_password === true,
           });
         }
       } catch (error) {
         console.error("Error al restaurar la sesión.", error);
+        redirectToPanel();
       } finally {
         if (active) {
           setHydrating(false);
@@ -189,15 +208,21 @@ const Cuestionario = () => {
               Cargando…
             </p>
           </div>
-        ) : (
+        ) : session ? (
           <InicioQuiz
-            key={session ? session.studentId : "anon"}
+            key={session.studentId}
             session={session}
-            onLogin={handleLogin}
             onLogout={handleLogout}
             onStartQuiz={handleStartQuiz}
             onViewResult={handleViewResult}
           />
+        ) : (
+          // Redirect to the panel is already in progress (no session).
+          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-8 rounded-xl bg-indigo-950/50 p-8 shadow-xl backdrop-blur-sm">
+            <p className="text-lg font-semibold text-indigo-200">
+              Redirigiendo al panel de administración…
+            </p>
+          </div>
         )}
       </div>
     );

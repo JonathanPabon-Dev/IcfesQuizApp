@@ -79,23 +79,6 @@ export const getQuizzesByCourse = async (courseId) => {
   return (data || []).map((row) => row.quizzes).filter(Boolean);
 };
 
-export const loginStudent = async (code, password) => {
-  try {
-    const { data, error } = await supabase.rpc("login_student", {
-      p_code: Number(code),
-      p_password: password,
-    });
-    if (error) {
-      console.error("Error al validar las credenciales.", error);
-      return null;
-    }
-    return data;
-  } catch (error) {
-    console.error("Error al validar las credenciales.", error);
-    return null;
-  }
-};
-
 // Resuelve el estudiante vinculado a la sesión de Supabase Auth
 // (auth.uid() -> fila en students, security definer en el panel).
 // Devuelve { data, error } para que el llamador distinga entre
